@@ -3,23 +3,23 @@
     <div class="login-container">
       <div class="left-panel">
         <div class="logo">
-          <img src="@/assets/logo.png" alt="Noah Wang Studio" />
+          <img :src="logo" alt="Noah Wang Studio" />
         </div>
       </div>
       <div class="right-panel">
         <h1 class="welcome-text">欢迎登录Noah Wang STUDIO 后台管理平台</h1>
         <van-form @submit="handleSubmit" class="login-form">
           <van-field
-            v-model="loginForm.username"
-            name="username"
+            v-model="loginForm.userAccount"
+            name="userAccount"
             placeholder="请输入登录账号"
             :rules="[{ required: true, message: '请填写登录账号' }]"
             class="custom-input"
           />
           <van-field
-            v-model="loginForm.password"
+            v-model="loginForm.userPassword"
             type="password"
-            name="password"
+            name="userPassword"
             placeholder="请输入登录密码"
             :rules="[{ required: true, message: '请填写登录密码' }]"
             class="custom-input"
@@ -47,25 +47,29 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { setToken } from '@/utils/auth'
+import type { LoginParams } from '@/types/auth'
+import { login } from '@/api/auth'
+import img from '@/assets/logo.jpg'
 
 const router = useRouter()
 const loading = ref(false)
+const logo = img
 
-const loginForm = reactive({
-  username: '',
-  password: ''
+const loginForm = reactive<LoginParams>({
+  userAccount: '',
+  userPassword: ''
 })
 
 const handleSubmit = async () => {
   loading.value = true
   try {
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    const token = 'mock_token_' + Date.now()
-    setToken(token)
+    const response = await login(loginForm)
+    console.log(response)
+    setToken(response?.accessToken)
     showToast('登录成功')
     router.push('/pc/home')
-  } catch (error) {
-    showToast('登录失败')
+  } catch (error: any) {
+    showToast(error?.message || '登录失败')
   } finally {
     loading.value = false
   }

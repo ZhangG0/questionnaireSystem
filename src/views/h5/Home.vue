@@ -15,13 +15,19 @@
 import { useRouter } from 'vue-router'
 import { showToast } from 'vant'
 import { removeToken } from '@/utils/auth'
+import { logout } from '@/api/auth'
 
 const router = useRouter()
 
-const handleLogout = () => {
-  removeToken()
-  showToast('已退出登录')
-  router.push('/h5/login')
+const handleLogout = async () => {
+  try {
+    await logout()
+    removeToken()
+    showToast('已退出登录')
+    router.push('/h5/login')
+  } catch (error: any) {
+    showToast(error?.message || '退出登录失败')
+  }
 }
 </script>
 

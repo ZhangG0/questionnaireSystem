@@ -68,4 +68,18 @@ export interface UserInfo {
   gmtCreate: string
   gmtModified: string
   status: string
+}
+
+// H5 登录请求参数类型
+export interface H5LoginParams {
+  userAccount: string
+  userPassword: string
+  issueId?: string
+  surveyId?: string
+}
+
+// H5 登录响应数据类型（与 PC 端相同，可以复用）
+export interface LoginResponse {
+  accessToken: string
+  expireIn: number
 } 

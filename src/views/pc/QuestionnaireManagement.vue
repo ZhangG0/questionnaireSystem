@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="left">
         <h2 class="title">查看问卷</h2>
-        <div class="subtitle">共 {{ questionnaireList.length }} 个问卷</div>
+        <div class="subtitle">共 {{ questionnaireList?.length || 0 }} 个问卷</div>
       </div>
       <a-button type="primary" shape="round" @click="handleAdd" class="add-btn">
         <template #icon>
@@ -118,20 +118,7 @@ interface Questionnaire {
 const router = useRouter()
 
 // 问卷列表数据
-const questionnaireList = ref<Questionnaire[]>([
-  {
-    id: '12345678901234',
-    title: '1号问卷'
-  },
-  {
-    id: '12345678901235',
-    title: '2号问卷'
-  },
-  {
-    id: '12345678901236',
-    title: '3号问卷'
-  }
-])
+const questionnaireList = ref<Questionnaire[]>([])
 
 // 下发成功的 Dialog
 const showIssueDialog = ref(false)
@@ -140,12 +127,16 @@ const issueLink = ref('')
 // 获取问卷列表
 const fetchSurveysList = async () => {
   try {
-    const response = await getSurveysList();
+    const response = await getSurveysList()
     if (response) {
-      questionnaireList.value = response.data; // 更新问卷列表
+      questionnaireList.value = response.map(item => ({
+        id: item.id,
+        title: item.title,
+        gmtCreate: item.gmtCreate
+      }))
     }
   } catch (error) {
-    Message.error('获取问卷列表失败');
+    Message.error('获取问卷列表失败')
   }
 }
 
@@ -153,12 +144,8 @@ const fetchSurveysList = async () => {
 const handleAdd = () => {
   router.push({
     path: '/pc/questionnaireEdit',
-    query: { id: Date.now().toString() }
+    query: { type: 'new' }
   })
-}
-
-const handleDownload = (item: Questionnaire) => {
-  Message.success('开始下载问卷数据')
 }
 
 const handleEdit = (item: Questionnaire) => {
@@ -178,8 +165,8 @@ const handleStats = (item: Questionnaire) => {
 const handleCopy = async (item: Questionnaire) => {
   router.push({
     path: '/pc/questionnaireEdit',
-    query: { type: 'new', surveyId: item.id }
-  });
+    query: { type: 'copy', surveyId: item.id }
+  })
 }
 
 const handleIssue = async (item: Questionnaire) => {

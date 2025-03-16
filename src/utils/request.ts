@@ -1,11 +1,11 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse, AxiosRequestHeaders } from 'axios'
 import { Message } from '@arco-design/web-vue'
-import { getToken } from './auth'
+import { getToken, removeToken } from './auth'
 import router from "@/router";
 
 // 创建 axios 实例
 const request: AxiosInstance = axios.create({
-  baseURL: 'http://35.79.221.247',
+  baseURL: 'http://57.180.252.48',
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json;charset=utf-8'
@@ -31,30 +31,32 @@ request.interceptors.request.use(
 request.interceptors.response.use(
   (response: AxiosResponse) => {
     const { data } = response
-    // 这里可以根据后端的数据结构进行调整
     if (data.code === 200) {
       return data.data
     } else {
       switch (Number(data.code)) {
         case 401:
           Message.error('登录已过期，请重新登录')
-          router.push('/pc/login')
-          break
+          // 清除 token
+          removeToken()
+          // 判断当前路径是否为 H5 端
+          const isH5 = window.location.pathname.startsWith('/h5')
+          router.push(isH5 ? '/h5/login' : '/pc/login')
+          return Promise.reject(new Error('登录已过期'))
         case 403:
           Message.error('没有权限访问')
-          break
+          return Promise.reject(new Error('没有权限访问'))
         case 404:
           Message.error('请求的资源不存在')
-          break
+          return Promise.reject(new Error('资源不存在'))
         case 500:
           Message.error('服务器错误')
-          break
+          return Promise.reject(new Error('服务器错误'))
         default:
           Message.error(data?.message || '请求失败')
+          return Promise.reject(new Error(data?.message || '请求失败'))
       }
-
     }
-    return Promise.reject(new Error('请求失败'))
   },
   (error) => {
     if (error.response) {
@@ -62,26 +64,32 @@ request.interceptors.response.use(
       switch (status) {
         case 401:
           Message.error('登录已过期，请重新登录')
-          router.push('/pc/login')
-          break
+          // 清除 token
+          removeToken()
+          // 判断当前路径是否为 H5 端
+          const isH5 = window.location.pathname.startsWith('/h5')
+          router.push(isH5 ? '/h5/login' : '/pc/login')
+          return Promise.reject(new Error('登录已过期'))
         case 403:
           Message.error('没有权限访问')
-          break
+          return Promise.reject(new Error('没有权限访问'))
         case 404:
           Message.error('请求的资源不存在')
-          break
+          return Promise.reject(new Error('资源不存在'))
         case 500:
           Message.error('服务器错误')
-          break
+          return Promise.reject(new Error('服务器错误'))
         default:
           Message.error(data?.message || '请求失败')
+          return Promise.reject(new Error(data?.message || '请求失败'))
       }
     } else if (error.request) {
       Message.error('网络错误，请检查网络连接')
+      return Promise.reject(new Error('网络错误'))
     } else {
       Message.error('请求配置错误')
+      return Promise.reject(new Error('请求配置错误'))
     }
-    return Promise.reject(error)
   }
 )
 

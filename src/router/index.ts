@@ -61,16 +61,27 @@ const router = createRouter({
     },
     // H5端路由
     {
-      path: '/h5/login',
-      name: 'h5Login',
-      component: () => import('@/views/h5/Login.vue'),
-      meta: { requiresAuth: false }
-    },
-    {
-      path: '/h5/home',
-      name: 'h5Home',
-      component: () => import('@/views/h5/Home.vue'),
-      meta: { requiresAuth: true }
+      path: '/h5',
+      children: [
+        {
+          path: 'login',
+          name: 'h5Login',
+          component: () => import('@/views/h5/Login.vue'),
+          meta: { requiresAuth: false }
+        },
+        {
+          path: 'home',
+          name: 'h5Home',
+          component: () => import('@/views/h5/Home.vue'),
+          meta: { requiresAuth: true }
+        },
+        {
+          path: 'survey',
+          name: 'h5Survey',
+          component: () => import('@/views/h5/Survey.vue'),
+          meta: { requiresAuth: true }
+        }
+      ]
     }
   ]
 })
@@ -81,9 +92,31 @@ const whiteList = ['/pc/login', '/h5/login']
 router.beforeEach((to, from, next) => {
   const hasToken = getToken()
 
-  if (hasToken) {
+  // H5 端路由处理
+  if (to.path.startsWith('/h5')) {
     if (to.path === '/h5/login') {
-      next({ path: '/h5/home' })
+      // 如果已登录且有重定向地址，则跳转到重定向地址
+      if (hasToken && to.query.redirect) {
+        next({ path: to.query.redirect as string })
+      } else {
+        next() // 否则正常进入登录页
+      }
+    } else {
+      // 非登录页需要验证登录状态
+      if (!hasToken) {
+        showToast('请先登录')
+        next(`/h5/login?redirect=${to.path}`)
+      } else {
+        next()
+      }
+    }
+    return
+  }
+
+  // PC 端路由处理
+  if (hasToken) {
+    if (to.path === '/pc/login') {
+      next({ path: '/pc/home' })
     } else {
       next()
     }
@@ -91,8 +124,7 @@ router.beforeEach((to, from, next) => {
     if (whiteList.includes(to.path)) {
       next()
     } else {
-      showToast('请先登录')
-      next(`/h5/login?redirect=${to.path}`)
+      next(`/pc/login?redirect=${to.path}`)
     }
   }
 })

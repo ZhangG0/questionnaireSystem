@@ -1,11 +1,12 @@
 import { post } from '@/utils/request';
-import type { SurveyRequest } from '@/types/survey';
+import type { SurveyRequest, SurveyDetail } from '@/types/survey';
 
 /**
  * 保存问卷
  * @param params 保存问卷的请求参数
  */
 export const saveSurvey = (params: SurveyRequest) => {
+  console.log(params);
   return post<string>('/surveys/saveSurveys', params);
 }
 
@@ -28,8 +29,17 @@ export const issueSurvey = (params: { surveyId: string }) => {
 /**
  * 获取问卷列表
  */
+interface SurveyListResponse {
+  id: string
+  title: string
+  description: string | null
+  gmtCreate: string
+  gmtModified: string
+  status: string
+}
+
 export const getSurveysList = () => {
-  return post<{ id: string; title: string; description: string | null; gmtCreate: string; gmtModified: string; status: string }[]>('/surveys/getSurveysList');
+  return post<SurveyListResponse[]>('/surveys/getSurveysList')
 }
 
 /**
@@ -65,4 +75,36 @@ interface QuantityStatisticsResponse {
 
 export const getQuantityStatistics = (params: { surveyId: string }) => {
   return post<QuantityStatisticsResponse>('/responses/getQuantityStatistics', params);
+}
+
+/**
+ * 获取 H5 端问卷列表
+ */
+export const getH5SurveysList = () => {
+  return post<{
+    surveyId: string
+    status: string
+    bindTime: string
+  }[]>('/app/surveys/list')
+}
+
+/**
+ * 获取问卷详情
+ */
+export const getH5SurveyDetail = (params: { surveyId: string }) => {
+  return post<SurveyDetail>('/app/surveys/getSurveysBySurveyId', params)
+}
+
+/**
+ * 复制问卷
+ */
+export const copySurvey = (params: { surveyId: string }) => {
+  return post<SurveyRequest>('/surveys/copySurveys', params)
+}
+
+/**
+ * 获取编辑问卷详情
+ */
+export const getEditSurvey = (params: { surveyId: string }) => {
+  return post<SurveyRequest>('/surveys/editSurveys', params)
 } 

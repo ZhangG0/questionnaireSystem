@@ -11,6 +11,13 @@ export default defineConfig({
     }
   },
   server: {
+    proxy: {
+      '/': {
+        target: 'http://35.79.221.247',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\//, '')
+      }
+    },
     port: 3000,
     open: true,
     cors: true

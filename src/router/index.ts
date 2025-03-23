@@ -8,7 +8,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/pc/home'
+      redirect: 'login'
     },
     // PC端路由
     {
@@ -61,27 +61,22 @@ const router = createRouter({
     },
     // H5端路由
     {
-      path: '/h5',
-      children: [
-        {
-          path: 'login',
-          name: 'h5Login',
-          component: () => import('@/views/h5/Login.vue'),
-          meta: { requiresAuth: false }
-        },
-        {
-          path: 'home',
-          name: 'h5Home',
-          component: () => import('@/views/h5/Home.vue'),
-          meta: { requiresAuth: true }
-        },
-        {
-          path: 'survey',
-          name: 'h5Survey',
-          component: () => import('@/views/h5/Survey.vue'),
-          meta: { requiresAuth: true }
-        }
-      ]
+      path: '/login',
+      name: 'h5Login',
+      component: () => import('@/views/h5/Login.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/home',
+      name: 'h5Home',
+      component: () => import('@/views/h5/Home.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/survey',
+      name: 'h5Survey',
+      component: () => import('@/views/h5/Survey.vue'),
+      meta: { requiresAuth: true }
     }
   ]
 })

@@ -73,7 +73,7 @@ const loginForm = reactive<H5LoginParams>({
   userAccount: '',
   userPassword: '',
   // 如果 URL 中有这些参数，则添加到登录请求中
-  issueId: route.query.issueId as string,
+  issueId: route.query.surveyIssueId as string,
   surveyId: route.query.surveyId as string
 })
 
@@ -91,11 +91,11 @@ const handleSubmit = async () => {
         onClose: () => {
           // 如果有问卷 ID，直接跳转到问卷页面
           if (loginForm.surveyId) {
-            router.replace(`/h5/survey?id=${loginForm.surveyId}`)
+            router.replace(`/survey?id=${loginForm.surveyId}`)
           } else {
             // 否则跳转到首页或重定向地址
             const redirect = route.query.redirect as string
-            router.replace(redirect || '/h5/home')
+            router.replace(redirect || '/home')
           }
         }
       })
@@ -198,4 +198,4 @@ const handleSubmit = async () => {
     }
   }
 }
-</style> 
+</style>

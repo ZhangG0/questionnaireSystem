@@ -1,3 +1,6 @@
+<!-- 问卷编辑页面 TODO LIST -->
+<!-- 1. 问题逻辑设置，当所有可关联的题目都被关联时禁止添加 -->
+<!-- 2. 问题逻辑设置，当相同题目已经被关联时 -->
 <template>
   <div class="questionnaire-edit">
     <div class="page-header">
@@ -8,6 +11,8 @@
         <a-button type="primary" :loading="saving" @click="handleSave">保存问卷</a-button>
       </div>
     </div>
+
+    <pre style="background: #fff; padding: 8px; margin-top: 8px;">{{ JSON.stringify(survey, null, 2) }}</pre>
 
     <!-- 问卷标题 -->
     <div class="title-section">
@@ -33,6 +38,9 @@
           <div class="left">
             <span class="question-index">Q{{ index + 1 }}</span>
             <span class="question-title">{{ question.questionTitle }}</span>
+            <a-tag size="small" color="arcoblue">
+              {{ getQuestionTypeLabel(question.questionType) }}
+            </a-tag>
             <a-tag size="small" :color="question.isRequired === '1' ? 'red' : ''">
               {{ question.isRequired === '1' ? '必填' : '选填' }}
             </a-tag>
@@ -130,31 +138,32 @@
       v-model:visible="showSettingDrawer"
       :width="650"
       title="问题设置"
-      :footer="false"
-      @close="showSettingDrawer = false"
+      :mask-closable="false"
+      :footer="true"
+      :closable="false"
     >
-      <template v-if="currentQuestion">
-        <a-form :model="currentQuestion" layout="vertical">
+      <template v-if="tempQuestion">
+        <a-form :model="tempQuestion" layout="vertical">
           <!-- 通用设置 -->
           <a-form-item field="title" label="问题标题">
             <a-input
-              v-model="currentQuestion.questionTitle"
+              v-model="tempQuestion.questionTitle"
               placeholder="请输入问题标题"
               allow-clear
             />
           </a-form-item>
           <a-form-item field="required" label="是否必填">
-            <a-switch 
-              :model-value="currentQuestion.isRequired === '1'"
-              @change="(val) => currentQuestion.isRequired = val ? '1' : '0'"
+            <a-switch
+              :model-value="tempQuestion.isRequired === '1'"
+              @change="(val: boolean) => tempQuestion.isRequired = val ? '1' : '0'"
             />
           </a-form-item>
 
           <!-- 选择题特有设置 -->
           <template
             v-if="
-              currentQuestion.questionType === QuestionType.SINGLE_CHOICE ||
-              currentQuestion.questionType === QuestionType.MULTIPLE_CHOICE
+              tempQuestion.questionType === QuestionType.SINGLE_CHOICE ||
+              tempQuestion.questionType === QuestionType.MULTIPLE_CHOICE
             "
           >
             <a-divider>选项列表</a-divider>
@@ -162,7 +171,7 @@
               <div class="option-area">
                 <div class="option-list">
                   <div
-                    v-for="(option, index) in currentQuestion.optionList as Array<OptionRequest>"
+                    v-for="(option, index) in tempQuestion.optionList as Array<OptionRequest>"
                     :key="option.optionId"
                     class="option-edit-item"
                   >
@@ -172,7 +181,7 @@
                     <a-button
                       type="text"
                       status="danger"
-                      :disabled="currentQuestion.optionList.length <= 2"
+                      :disabled="tempQuestion.optionList.length <= 2"
                       @click="handleDeleteOption(index)"
                     >
                       <template #icon><icon-delete /></template>
@@ -189,111 +198,134 @@
             </a-form-item>
           </template>
 
-          <!-- 展示逻辑设置 -->
-          <a-divider>展示逻辑</a-divider>
-          <div class="logic-settings">
-            <a-form-item label="符合条件时">
-              <a-select
-                v-model="currentQuestion.logic.showType"
-                placeholder="请选择显示条件"
-                style="width: 160px"
-              >
-                <a-option :value="LogicShowType.ALL">全部</a-option>
-                <a-option :value="LogicShowType.ANY">任一</a-option>
-              </a-select>
-              <span class="condition-text">关联条件时才显示本题目</span>
-            </a-form-item>
+          <template v-if="previousQuestions.length > 0">
+            <!-- 展示逻辑设置 -->
+            <a-divider>展示逻辑</a-divider>
+            <div class="logic-settings">
+              <a-form-item>
+                <a-space>
+                  <a-switch
+                      v-model="isLogicEnabled"
+                      @change="handleLogicEnableChange"
+                  />
+                  <span>启用展示逻辑</span>
+                </a-space>
+              </a-form-item>
 
-            <!-- 如果没有可选的前置题目，显示提示 -->
-            <div v-if="previousQuestions.length === 0" class="empty-tip">
-              <a-empty description="暂无可关联的选择题" />
-            </div>
+              <template v-if="isLogicEnabled">
+                <a-form-item label="符合条件时">
+                  <a-select
+                      v-model="tempLogicSettings!.showType"
+                      placeholder="请选择显示条件"
+                      style="width: 160px"
+                  >
+                    <a-option :value="LogicShowType.ALL">全部</a-option>
+                    <a-option :value="LogicShowType.ANY">任一</a-option>
+                  </a-select>
+                  <span class="condition-text">关联条件时才显示本题目</span>
+                </a-form-item>
 
-            <!-- 有可选的前置题目时显示规则列表 -->
-            <template v-else>
-              <div class="logic-rules">
-                <div
-                  v-for="(rule, index) in currentQuestion?.logic?.logicConditionList"
-                  :key="index"
-                  class="logic-rule"
-                >
-                  <div class="rule-header">
-                    <span class="rule-index">条件{{ index + 1 }}：</span>
-                    <a-button
-                      type="text"
-                      status="danger"
-                      class="delete-btn"
-                      @click="removeLogicRule(Number(index))"
+                <!-- 如果没有可选的前置题目，显示提示 -->
+                <div v-if="previousQuestions.length === 0" class="empty-tip">
+                  <a-empty description="暂无可关联的选择题" />
+                </div>
+
+                <!-- 有可选的前置题目时显示规则列表 -->
+                <template v-else>
+                  <div class="logic-rules">
+                    <div
+                        v-for="(rule, index) in tempLogicSettings?.logicConditionList"
+                        :key="index"
+                        class="logic-rule"
                     >
-                      <template #icon><icon-delete /></template>
+                      <div class="rule-header">
+                        <span class="rule-index">条件{{ index + 1 }}：</span>
+                        <a-button
+                            type="text"
+                            status="danger"
+                            class="delete-btn"
+                            @click="removeLogicRule(Number(index))"
+                        >
+                          <template #icon><icon-delete /></template>
+                        </a-button>
+                      </div>
+                      <div class="rule-content">
+                        <a-form-item label="关联题目">
+                          <a-select
+                              v-model="rule.questionId"
+                              placeholder="选择关联题目"
+                              style="width: 200px"
+                              allow-clear
+                          >
+                            <a-option
+                                v-for="q in previousQuestions"
+                                :key="q.questionId || q.frontQuestionId"
+                                :value="q.questionId || q.frontQuestionId"
+                                :disabled="
+                              q.questionId === tempQuestion.questionId ||
+                              q.frontQuestionId === tempQuestion.frontQuestionId
+                            "
+                            >
+                              {{ q.questionTitle }}
+                            </a-option>
+                          </a-select>
+                        </a-form-item>
+                        <a-form-item label="选项操作">
+                          <a-select
+                              v-model="rule.operationType"
+                              placeholder="选择条件"
+                              style="width: 200px"
+                          >
+                            <a-option :value="LogicShowType.ANY">任一选中</a-option>
+                            <a-option :value="LogicShowType.ALL">全部选中</a-option>
+                          </a-select>
+                        </a-form-item>
+                        <a-form-item label="选项选择" v-if="rule.questionId">
+                          <a-select
+                              v-model="rule.selectedOptionIds"
+                              placeholder="请选择选项"
+                              style="width: 200px"
+                              allow-clear
+                              multiple
+                          >
+                            <a-option
+                                v-for="option in getRelatedQuestionOptions(rule?.questionId || rule?.frontQuestionId)"
+                                :key="option.optionId || option.frontOptionId || option.optionText"
+                                :value="option.optionId || option.frontOptionId"
+                                :label="option.optionText"
+                            >
+                              {{ option.optionText }}
+                            </a-option>
+                          </a-select>
+                        </a-form-item>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="add-rule">
+                    <a-button
+                        type="dashed"
+                        @click="addLogicRule"
+                        :disabled="previousQuestions.length === 0"
+                    >
+                      <template #icon><icon-plus /></template>
+                      添加条件
                     </a-button>
                   </div>
-                  <div class="rule-content">
-                    <a-form-item label="关联题目">
-                      <a-select
-                        v-model="rule.questionId"
-                        placeholder="选择关联题目"
-                        style="width: 200px"
-                        allow-clear
-                      >
-                        <a-option
-                          v-for="q in previousQuestions"
-                          :key="q.questionId || q.frontQuestionId"
-                          :value="q.questionId || q.frontQuestionId"
-                          :disabled="
-                            q.questionId === currentQuestion.questionId ||
-                            q.frontQuestionId === currentQuestion.frontQuestionId
-                          "
-                        >
-                          {{ q.questionTitle }}
-                        </a-option>
-                      </a-select>
-                    </a-form-item>
-                    <a-form-item label="选项操作">
-                      <a-select
-                        v-model="rule.operationType"
-                        placeholder="选择条件"
-                        style="width: 200px"
-                      >
-                        <a-option :value="LogicShowType.ANY">任一选中</a-option>
-                        <a-option :value="LogicShowType.ALL">全部选中</a-option>
-                      </a-select>
-                    </a-form-item>
-                    <a-form-item label="选项选择" v-if="rule.questionId">
-                      <a-select
-                        v-model="rule.selectedOptionIds"
-                        placeholder="请选择选项"
-                        style="width: 200px"
-                        allow-clear
-                        multiple
-                      >
-                        <a-option
-                          v-for="option in getRelatedQuestionOptions(rule?.questionId || rule?.frontQuestionId)"
-                          :key="option.optionId || option.frontOptionId || option.optionText"
-                          :value="option.optionId || option.frontOptionId"
-                          :label="option.optionText"
-                        >
-                          {{ option.optionText }}
-                        </a-option>
-                      </a-select>
-                    </a-form-item>
-                  </div>
-                </div>
-              </div>
-
-              <div class="add-rule">
-                <a-button 
-                  type="dashed" 
-                  @click="addLogicRule"
-                  :disabled="previousQuestions.length === 0"
-                >
-                  <template #icon><icon-plus /></template>
-                  添加条件
-                </a-button>
-              </div>
-            </template>
-          </div>
+                </template>
+              </template>
+            </div>
+          </template>
         </a-form>
+      </template>
+
+      <template #footer>
+        <div class="drawer-footer">
+          <a-space>
+            <a-button @click="handleCancel">取消</a-button>
+            <a-button type="primary" @click="handleConfirm">确认</a-button>
+          </a-space>
+        </div>
       </template>
     </a-drawer>
   </div>
@@ -302,7 +334,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Message } from '@arco-design/web-vue'
+import { Message, Modal } from '@arco-design/web-vue'
 import {
   IconCalendar,
   IconDelete,
@@ -320,7 +352,8 @@ import {
   OptionRequest,
   QuestionRequest,
   QuestionType,
-  SurveyRequest
+  SurveyRequest,
+  LogicConditionOption
 } from '@/types/survey'
 import { v4 as uuidv4 } from 'uuid'
 import { copySurvey, getEditSurvey, saveSurvey } from '@/api/survey'
@@ -390,8 +423,8 @@ const previousQuestions = computed(() => {
   const currentIndex = survey.value.questionList.findIndex(
     q => q.questionId === currentQuestionId.value
   )
-  return survey.value.questionList.slice(0, currentIndex).filter(q => 
-    q.questionType === QuestionType.SINGLE_CHOICE || 
+  return survey.value.questionList.slice(0, currentIndex).filter(q =>
+    q.questionType === QuestionType.SINGLE_CHOICE ||
     q.questionType === QuestionType.MULTIPLE_CHOICE
   )
 })
@@ -401,40 +434,29 @@ interface LogicConditionWithSelectedIds extends LogicCondition {
   selectedOptionIds: string[]
 }
 
+// 扩展 Logic 接口
+interface LogicWithSelectedIds extends Logic {
+  logicConditionList: LogicConditionWithSelectedIds[]
+}
+
+// 当前问题的临时逻辑设置
+const tempLogicSettings = ref<LogicWithSelectedIds | null>(null)
+
 // 初始化逻辑设置
-const initLogicSettings = (): Logic => {
+const initLogicSettings = (): LogicWithSelectedIds => {
   return {
     showType: LogicShowType.ALL,
     logicConditionList: []
   }
 }
 
-// 当前问题的逻辑设置
-const logicSettings = computed({
-  get: () => {
-    if (!currentQuestion.value?.logic) {
-      currentQuestion.value!.logic = initLogicSettings()
-    }
-    return currentQuestion.value!.logic
-  },
-  set: (value: Logic) => {
-    if (currentQuestion.value) {
-      currentQuestion.value.logic = value
-    }
-  }
-})
-
 // 添加逻辑规则
 const addLogicRule = () => {
-  if (!currentQuestion.value) return
-  
-  if (!currentQuestion.value.logic) {
-    currentQuestion.value.logic = {
-      showType: LogicShowType.ALL,
-      logicConditionList: []
-    }
+  if (!tempLogicSettings.value) {
+    // 如果还没有初始化逻辑设置，先初始化
+    tempLogicSettings.value = initLogicSettings()
   }
-  
+
   // 初始化一个新的逻辑条件
   const newLogicCondition: LogicConditionWithSelectedIds = {
     logicConditionId: '',
@@ -446,49 +468,178 @@ const addLogicRule = () => {
     logicConditionOptionList: [],
     selectedOptionIds: [] // 初始化为空数组
   }
-  
-  currentQuestion.value.logic.logicConditionList.push(newLogicCondition)
+
+  tempLogicSettings.value.logicConditionList.push(newLogicCondition)
 }
 
-// 处理问题点击，初始化逻辑条件的selectedOptionIds
-const handleQuestionClick = (question: QuestionRequest) => {
-  // 如果logic是空值则初始化一下
-  if (!question.logic) {
-    question.logic = initLogicSettings()
-  }
-  
-  // 初始化每个逻辑条件的selectedOptionIds和关联问题ID
-  if (question.logic.logicConditionList) {
-    question.logic.logicConditionList.forEach(rule => {
-      // 从logicConditionOptionList中提取选项ID
-      const selectedIds = rule.logicConditionOptionList.map(option => 
-        option.optionId || option.frontOptionId || ''
-      ).filter(id => id)
-      
-      // 设置selectedOptionIds
-      ;(rule as LogicConditionWithSelectedIds).selectedOptionIds = selectedIds
-      
-      // 如果questionId为null，尝试从选项中找到关联的问题
-      if (!rule.questionId && !rule.frontQuestionId && rule.logicConditionOptionList.length > 0) {
-        const firstOptionId = rule.logicConditionOptionList[0].optionId || rule.logicConditionOptionList[0].frontOptionId
-        
-        // 查找包含该选项的问题
-        const relatedQuestion = survey.value.questionList.find(q => 
-          q.optionList?.some(opt => 
-            opt.optionId === firstOptionId || opt.frontOptionId === firstOptionId
-          )
+// 添加临时存储
+const tempQuestion = ref<QuestionRequest | null>(null)
+
+// 修改确认处理函数
+const handleConfirm = () => {
+  if (!tempQuestion.value || !currentQuestion.value) return
+
+  // 检查逻辑设置是否有效
+  if (isLogicEnabled.value) {
+    if (!tempLogicSettings.value?.logicConditionList?.length) {
+      Message.warning('请至少添加一个展示逻辑条件')
+      return
+    }
+
+    // 检查每个逻辑条件是否都选择了选项
+    const hasInvalidRule = tempLogicSettings.value.logicConditionList.some(
+      rule => !rule.selectedOptionIds?.length
+    )
+    if (hasInvalidRule) {
+      Message.warning('请为每个展示逻辑条件选择关联选项')
+      return
+    }
+
+    // 构建完整的逻辑对象
+    const logicId = currentQuestion.value.logic?.logicId || `new_${uuidv4()}`
+    const questionId = currentQuestion.value.questionId || currentQuestion.value.frontQuestionId || ''
+    
+    const logic = {
+      logicId,
+      questionId,
+      showType: tempLogicSettings.value.showType,
+      logicConditionList: tempLogicSettings.value.logicConditionList.map(rule => {
+        const logicConditionId = rule.logicConditionId || `new_${uuidv4()}`
+        const relatedQuestion = previousQuestions.value.find(
+          q => q.questionId === rule.questionId || q.frontQuestionId === rule.questionId
         )
-        
-        if (relatedQuestion) {
-          rule.questionId = relatedQuestion.questionId
-          rule.frontQuestionId = relatedQuestion.frontQuestionId
-          rule.questionTitle = relatedQuestion.questionTitle
+
+        // 构建选项列表
+        const logicConditionOptionList = rule.selectedOptionIds.map((optionId, index) => {
+          const option = getRelatedQuestionOptions(rule.questionId).find(
+            o => o.optionId === optionId || o.frontOptionId === optionId
+          )
+          return {
+            logicConditionOptionId: `new_${uuidv4()}`,
+            logicConditionId,
+            optionId: option?.optionId || option?.frontOptionId || '',
+            frontOptionId: option?.frontOptionId || '',
+            optionText: option?.optionText || ''
+          }
+        })
+
+        return {
+          logicConditionId,
+          logicId,
+          questionId: rule.questionId,
+          frontQuestionId: relatedQuestion?.frontQuestionId || null,
+          questionTitle: relatedQuestion?.questionTitle || '',
+          operationType: rule.operationType,
+          logicConditionOptionList
         }
-      }
-    })
+      })
+    }
+
+    currentQuestion.value.logic = logic
+  } else {
+    currentQuestion.value.logic = null
   }
+
+  // 更新当前问题的其他字段
+  Object.assign(currentQuestion.value, {
+    ...tempQuestion.value,
+    logic: currentQuestion.value.logic
+  })
+
+  // 重置临时状态
+  tempQuestion.value = JSON.parse(JSON.stringify(currentQuestion.value))
+  if (currentQuestion.value.logic) {
+    tempLogicSettings.value = {
+      ...currentQuestion.value.logic,
+      logicConditionList: currentQuestion.value.logic.logicConditionList.map(condition => ({
+        ...condition,
+        selectedOptionIds: condition.logicConditionOptionList.map(
+          option => option.optionId || option.frontOptionId
+        )
+      }))
+    }
+  } else {
+    tempLogicSettings.value = null
+    isLogicEnabled.value = false
+  }
+
+  Message.success(`问题：${currentQuestion.value.questionTitle} 暂存成功`)
+  showSettingDrawer.value = false
+}
+
+// 处理取消按钮点击
+const handleCancel = () => {
+
+  // 有改动时，显示确认弹框
+  Modal.confirm({
+    title: '确认关闭弹框',
+    content: '更改将不会被保存，是否确认关闭？',
+    onOk: () => {
+      // 关闭时重置所有临时状态
+      tempQuestion.value = null
+      tempLogicSettings.value = null
+      isLogicEnabled.value = false
+      showSettingDrawer.value = false
+    }
+  })
+}
+
+// 添加展示逻辑开关状态
+const isLogicEnabled = ref(false)
+
+// 处理展示逻辑开关变化
+const handleLogicEnableChange = (enabled: boolean) => {
+  if (enabled) {
+    // 启用逻辑时初始化逻辑设置
+    tempLogicSettings.value = initLogicSettings()
+  } else {
+    // 关闭逻辑时清空逻辑设置
+    tempLogicSettings.value = null
+  }
+}
+
+// 当前问题的逻辑设置
+const logicSettings = computed({
+  get: () => {
+    if (!currentQuestion.value?.logic) {
+      currentQuestion.value!.logic = initLogicSettings()
+    }
+    return currentQuestion.value!.logic as LogicWithSelectedIds
+  },
+  set: (value: LogicWithSelectedIds) => {
+    if (currentQuestion.value) {
+      currentQuestion.value.logic = value
+    }
+  }
+})
+
+// 修改问题点击处理函数
+const handleQuestionClick = (question: QuestionRequest) => {
+  // 重置所有临时状态
+  isLogicEnabled.value = false
+  tempLogicSettings.value = null
   
-  // 使用 frontQuestionId 作为主要标识，因为新建的问题只有 frontQuestionId
+  // 创建临时副本
+  const questionCopy = JSON.parse(JSON.stringify(question)) as QuestionRequest
+  tempQuestion.value = questionCopy
+
+  // 根据是否有逻辑设置来初始化开关状态和逻辑设置
+  if (questionCopy.logic) {
+    isLogicEnabled.value = true
+    // 确保添加 selectedOptionIds
+    const logicWithSelectedIds = {
+      ...questionCopy.logic,
+      logicConditionList: questionCopy.logic.logicConditionList.map(condition => ({
+        ...condition,
+        selectedOptionIds: condition.logicConditionOptionList.map(option =>
+          option.optionId || option.frontOptionId || ''
+        )
+      }))
+    } as LogicWithSelectedIds
+    tempLogicSettings.value = logicWithSelectedIds
+  }
+
+  // 使用 frontQuestionId 作为主要标识
   currentQuestionId.value = question.frontQuestionId || question.questionId || ''
   showSettingDrawer.value = true
 }
@@ -496,10 +647,10 @@ const handleQuestionClick = (question: QuestionRequest) => {
 // 监听选项ID变化，更新logicConditionOptionList
 const updateLogicOptions = (rule: LogicConditionWithSelectedIds) => {
   if (!rule.selectedOptionIds || !rule.questionId) return
-  
+
   // 获取关联题目的所有选项
   const allOptions = getRelatedQuestionOptions(rule.questionId || rule.frontQuestionId)
-  
+
   // 根据选中的ID过滤出选中的选项
   rule.logicConditionOptionList = rule.selectedOptionIds
     .filter(id => id) // 过滤掉空字符串
@@ -521,7 +672,7 @@ const updateLogicOptions = (rule: LogicConditionWithSelectedIds) => {
 // 添加监听器
 watch(() => currentQuestion.value?.logic?.logicConditionList, (newList) => {
   if (!newList) return
-  
+
   // 为每个规则添加监听
   newList.forEach(rule => {
     watch(() => (rule as LogicConditionWithSelectedIds).selectedOptionIds, () => {
@@ -532,15 +683,17 @@ watch(() => currentQuestion.value?.logic?.logicConditionList, (newList) => {
 
 // 删除逻辑规则
 const removeLogicRule = (index: number) => {
-  logicSettings.value.logicConditionList.splice(index, 1)
+  if (tempLogicSettings.value) {
+    tempLogicSettings.value.logicConditionList.splice(index, 1)
+  }
 }
 
 // 获取关联题目的选项（questionId 或 frontQuestionId）
-const getRelatedQuestionOptions = (questionId: string) => {
+const getRelatedQuestionOptions = (questionId: string | undefined) => {
   if (!questionId) return []
-  
-  const question = survey.value.questionList.find(q => 
-    (q.questionId === questionId || q.frontQuestionId === questionId) && 
+
+  const question = survey.value.questionList.find(q =>
+    (q.questionId === questionId || q.frontQuestionId === questionId) &&
     (q.questionType === QuestionType.SINGLE_CHOICE || q.questionType === QuestionType.MULTIPLE_CHOICE)
   )
   return question?.optionList || []
@@ -585,19 +738,28 @@ const initSurvey = async () => {
 // 保存问卷
 const handleSave = async () => {
   try {
-    const request: SurveyRequest = survey.value
+    const request: SurveyRequest = JSON.parse(JSON.stringify(survey.value))
 
-    // 重新设置问题排序
+    // 重新设置问题排序并处理逻辑
     request.questionList.forEach((question, index) => {
       question.questionSort = (index + 1).toString()
-      
-      // 当逻辑的List为空时，不保存逻辑
-      if (question.logic && question.logic.logicConditionList.length === 0) {
-        question.logic = null
+
+      // 处理逻辑设置
+      if (question.logic) {
+        // 确保逻辑条件列表存在且不为空
+        if (!question.logic.logicConditionList?.length) {
+          question.logic = null
+        } else {
+          // 移除 selectedOptionIds 字段，因为它不是后端 API 需要的
+          question.logic.logicConditionList = question.logic.logicConditionList.map(condition => {
+            const { selectedOptionIds, ...rest } = condition
+            return rest
+          })
+        }
       }
     })
-    
-    console.log(request)
+
+    console.log('保存的数据：', request)
 
     const response = await saveSurvey(request)
     if (response) {
@@ -605,7 +767,8 @@ const handleSave = async () => {
       router.push('/pc/questionnaireManagement')
     }
   } catch (error) {
-    console.log(error)
+    console.error('保存失败：', error)
+    Message.error('保存失败')
   }
 }
 
@@ -648,14 +811,17 @@ const handleTypeSelect = (type: QuestionType) => {
             }
           ]
         : [],
-    logic: {
-      logicConditionList: [],
-      showType: LogicShowType.ANY
-    }
+    logic: null
   }
 
   survey.value.questionList.push(question)
-  // 添加问题后立即设置为当前问题
+  
+  // 重置所有临时状态
+  tempQuestion.value = JSON.parse(JSON.stringify(question))
+  isLogicEnabled.value = false
+  tempLogicSettings.value = null
+  
+  // 设置当前问题ID并打开抽屉
   currentQuestionId.value = newQuestionId
   showSettingDrawer.value = true
   showTypeModal.value = false
@@ -681,14 +847,14 @@ const handleDelete = (index: number) => {
 // 添加选项
 const handleAddOption = () => {
   if (
-    currentQuestion.value &&
-    (currentQuestion.value.questionType === QuestionType.SINGLE_CHOICE ||
-      currentQuestion.value.questionType === QuestionType.MULTIPLE_CHOICE)
+    tempQuestion.value &&
+    (tempQuestion.value.questionType === QuestionType.SINGLE_CHOICE ||
+      tempQuestion.value.questionType === QuestionType.MULTIPLE_CHOICE)
   ) {
-    currentQuestion.value.optionList?.push({
+    tempQuestion.value.optionList?.push({
       frontOptionId: `new_${uuidv4()}`,
-      optionText: `选项${currentQuestion.value.optionList?.length + 1}`,
-      optionSort: (currentQuestion.value.optionList?.length + 1).toString()
+      optionText: `选项${tempQuestion.value.optionList?.length + 1}`,
+      optionSort: (tempQuestion.value.optionList?.length + 1).toString()
     })
   }
 }
@@ -696,16 +862,32 @@ const handleAddOption = () => {
 // 删除选项
 const handleDeleteOption = (index: number) => {
   if (
-    currentQuestion.value &&
-    (currentQuestion.value.questionType === QuestionType.SINGLE_CHOICE ||
-      currentQuestion.value.questionType === QuestionType.MULTIPLE_CHOICE)
+    tempQuestion.value &&
+    (tempQuestion.value.questionType === QuestionType.SINGLE_CHOICE ||
+      tempQuestion.value.questionType === QuestionType.MULTIPLE_CHOICE)
   ) {
-    currentQuestion.value?.optionList?.splice(index, 1)
-    
+    tempQuestion.value?.optionList?.splice(index, 1)
+
     // 重新排序
-    currentQuestion.value?.optionList?.forEach((option, idx) => {
+    tempQuestion.value?.optionList?.forEach((option, idx) => {
       option.optionSort = (idx + 1).toString()
     })
+  }
+}
+
+// 获取问题类型标签文本
+const getQuestionTypeLabel = (type: QuestionType) => {
+  switch (type) {
+    case QuestionType.SINGLE_CHOICE:
+      return '单选'
+    case QuestionType.MULTIPLE_CHOICE:
+      return '多选'
+    case QuestionType.DATE:
+      return '日期'
+    case QuestionType.TEXT:
+      return '填空'
+    default:
+      return '未知'
   }
 }
 

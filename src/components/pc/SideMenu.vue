@@ -25,11 +25,6 @@ const currentPath = computed(() => route.path)
 
 const menus = [
   {
-    title: '新建问卷',
-    path: '/pc/questionnaireEdit',
-    icon: 'notes-o'
-  },
-  {
     title: '问卷管理',
     path: '/pc/questionnaireManagement',
     icon: 'notes-o'

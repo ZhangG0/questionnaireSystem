@@ -25,9 +25,6 @@
       <!-- 问卷标题 -->
       <div class="survey-title">
         <h1>{{ survey.surveysTitle }}</h1>
-        <div class="survey-desc" v-if="survey.description">
-          {{ survey.description }}
-        </div>
       </div>
 
       <!-- 问题列表 -->
@@ -74,8 +71,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showDialog } from 'vant'
-import { getH5SurveyDetail } from '@/api/survey'
-import type { SurveyDetail, Question, QuestionType } from '@/types/survey'
+import { getH5SurveyDetail, getH5SurveyAllDetail, editH5SurveyAllDetail } from '@/api/survey'
+import { QuestionType } from '@/types/survey'
+import type { SurveyDetail, Question } from '@/types/survey'
 import SingleChoice from './components/SingleChoice.vue'
 import MultipleChoice from './components/MultipleChoice.vue'
 import DatePicker from './components/DatePicker.vue'
@@ -106,7 +104,7 @@ const pageTitle = computed(() => {
 // 问卷数据
 const survey = ref<SurveyDetail>({
   surveyId: '',
-  surveysTitle: '',
+  surveysTitle: (route.query.title as string) || '----',
   questionList: []
 })
 
@@ -159,7 +157,21 @@ const fetchSurveyDetail = async () => {
       return
     }
 
-    const response = await getH5SurveyDetail({ surveyId })
+    const responseId = route.query.responseId as string
+    let response
+
+    // 根据不同场景选择不同的API请求
+    if (!responseId) {
+      // 没有responseId，表示新填写的问卷
+      response = await getH5SurveyDetail({ surveyId })
+    } else if (type.value === 'edit') {
+      // 编辑模式，使用editH5SurveyAllDetail
+      response = await editH5SurveyAllDetail({ surveyId, responseId })
+    } else {
+      // 查看模式，使用getH5SurveyAllDetail
+      response = await getH5SurveyAllDetail({ surveyId, responseId })
+    }
+
     if (response) {
       // 更新问卷数据
       survey.value = {
@@ -170,15 +182,21 @@ const fetchSurveyDetail = async () => {
 
       // 初始化答案数据
       response.questionList.forEach(question => {
-        if (question.questionType === QuestionType.MULTIPLE_CHOICE) {
-          // 多选题初始化为空数组
-          answers.value[question.questionId] = []
-        } else if (question.questionType === QuestionType.SINGLE_CHOICE) {
-          // 单选题初始化为空字符串
-          answers.value[question.questionId] = ''
+        // 如果已经有答案，使用已有答案
+        if (responseId && (question as any).answer) {
+          // TODO: 复现答案
+          answers.value[question.questionId] = (question as any).answer
         } else {
-          // 其他类型初始化为 null
-          answers.value[question.questionId] = null
+          if (question.questionType === QuestionType.MULTIPLE_CHOICE) {
+            // 多选题初始化为空数组
+            answers.value[question.questionId] = []
+          } else if (question.questionType === QuestionType.SINGLE_CHOICE) {
+            // 单选题初始化为空字符串
+            answers.value[question.questionId] = ''
+          } else {
+            // 其他类型初始化为 null
+            answers.value[question.questionId] = null
+          }
         }
       })
     }
@@ -252,17 +270,12 @@ onMounted(() => {
       padding: 20px;
       border-radius: 8px;
       margin-bottom: 12px;
+      text-align: center;
 
       h1 {
         font-size: 20px;
         font-weight: 600;
         margin: 0 0 8px;
-      }
-
-      .survey-desc {
-        font-size: 14px;
-        color: #666;
-        line-height: 1.5;
       }
     }
 

@@ -3,10 +3,12 @@
     <van-field
       v-model="inputValue"
       :disabled="disabled"
-      :placeholder="question.optionList[0]?.optionText || '请输入'"
+      :placeholder="question.optionList && question.optionList[0]?.optionText || '请输入'"
       type="textarea"
       rows="3"
-    />
+    >
+      <!-- 移除所有可能的隐式插槽 -->
+    </van-field>
   </div>
 </template>
 
@@ -24,13 +26,15 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()
 
-const inputValue = ref(props.modelValue)
+const inputValue = ref(props.modelValue || '')
 
 watch(inputValue, (newValue) => {
   emit('update:modelValue', newValue)
 })
 
 watch(() => props.modelValue, (newValue) => {
-  inputValue.value = newValue
+  if (newValue !== inputValue.value) {
+    inputValue.value = newValue || ''
+  }
 })
 </script> 

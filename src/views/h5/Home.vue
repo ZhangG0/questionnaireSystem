@@ -16,32 +16,35 @@
       <div class="survey-items">
         <div v-for="item in surveyList" :key="item.surveyId" class="survey-item">
           <div class="survey-info">
-            <div class="status-tag" :class="getStatusClass(item.status)">
-              {{ item.status }}
+            <div class="title-status-row">
+              <h3 class="survey-title">{{ item.surveyTitle }}</h3>
+              <div class="status-tag" :class="getStatusClass(item.responseStatus)">
+                {{ item.responseStatus }}
+              </div>
             </div>
             <div class="time">绑定时间：{{ item.bindTime }}</div>
           </div>
           <div class="survey-actions">
-            <van-button 
-              v-if="item.status === '未填写'" 
-              type="primary" 
-              size="small" 
+            <van-button
+              v-if="item.responseStatus === '未填写'"
+              type="primary"
+              size="small"
               @click="handleFill(item)"
             >
               去填写
             </van-button>
             <template v-else>
-              <van-button 
-                plain 
-                size="small" 
+              <van-button
+                plain
+                size="small"
                 @click="handleView(item)"
               >
                 查看
               </van-button>
-              <van-button 
-                v-if="item.status === '已填写'" 
-                type="primary" 
-                size="small" 
+              <van-button
+                v-if="item.responseStatus === '已填写'"
+                type="primary"
+                size="small"
                 @click="handleFill(item)"
               >
                 编辑
@@ -92,27 +95,13 @@ const userInfo = ref<UserInfo>({} as UserInfo)
 // 问卷列表
 interface SurveyItem {
   surveyId: string
-  status: string
+  surveyTitle: string
+  responseId: string
+  responseStatus: string
   bindTime: string
 }
 
-const surveyList = ref<SurveyItem[]>([
-  {
-    surveyId: '1',
-    status: '未填写',
-    bindTime: '2024-02-10'
-  },
-  {
-    surveyId: '2',
-    status: '已填写',
-    bindTime: '2024-02-09'
-  },
-  {
-    surveyId: '3',
-    status: '已填写，不可修改',
-    bindTime: '2024-02-08'
-  }
-])
+const surveyList = ref<SurveyItem[]>([])
 
 // 修改昵称相关
 const showEditDialog = ref(false)
@@ -139,7 +128,14 @@ const fetchSurveysList = async () => {
   try {
     const response = await getH5SurveysList()
     if (response) {
-      surveyList.value = response
+      // 确保返回数据符合SurveyItem接口要求
+      surveyList.value = response.map(item => ({
+        surveyId: item.surveyId,
+        surveyTitle: item.surveyTitle,
+        responseId: item.responseId || '',
+        responseStatus: item.responseStatus,
+        bindTime: item.bindTime
+      }))
     }
   } catch (error: any) {
     showToast(error?.message || '获取问卷列表失败')
@@ -152,7 +148,7 @@ const handleUpdateNickname = async () => {
     showToast('请输入昵称')
     return false
   }
-  
+
   // 检查昵称长度
   if (nicknameForm.wechatName.length > 20) {
     showToast('昵称不能超过20个字符')
@@ -185,21 +181,25 @@ const handleDialogClose = (action: string) => {
 
 // 填写问卷
 const handleFill = (item: SurveyItem) => {
-  if (item.status === '未填写') {
+  if (item.responseStatus === '未填写') {
     // 未填写状态，进入填写页面
     router.push({
       name: 'h5Survey',
-      query: { 
+      query: {
         id: item.surveyId,
+        responseId: item.responseId,
+        title: item.surveyTitle,
         type: 'edit'
       }
     })
-  } else if (item.status === '已填写') {
+  } else if (item.responseStatus === '已填写') {
     // 已填写状态，进入查看页面，可编辑
     router.push({
       name: 'h5Survey',
-      query: { 
+      query: {
         id: item.surveyId,
+        responseId: item.responseId,
+        title: item.surveyTitle,
         type: 'view'
       }
     })
@@ -210,9 +210,11 @@ const handleFill = (item: SurveyItem) => {
 const handleView = (item: SurveyItem) => {
   router.push({
     name: 'h5Survey',
-    query: { 
+    query: {
       id: item.surveyId,
-      type: item.status === '已填写，不可修改' ? 'readonly' : 'view'
+      responseId: item.responseId,
+      title: item.surveyTitle,
+      type: item.responseStatus === '已填写，不可修改' ? 'readonly' : 'view'
     }
   })
 }
@@ -233,7 +235,7 @@ const getStatusClass = (status: string) => {
 
 onMounted(() => {
   fetchUserInfo()
-  // fetchSurveysList() // 暂时注释掉，使用 mock 数据
+  fetchSurveysList()
 })
 </script>
 
@@ -241,32 +243,37 @@ onMounted(() => {
 .h5-home {
   min-height: 100vh;
   background-color: #f7f8fa;
-  padding: 20px;
+  padding: 5.33vw; // 20px转换为vw (基于375px设计稿)
 
   .header {
     text-align: center;
-    margin-bottom: 24px;
+    margin-bottom: 6.4vw; // 24px
 
     .logo {
-      width: 120px;
+      width: 32vw; // 120px
       height: auto;
-      margin-bottom: 16px;
+      margin-bottom: 4.27vw; // 16px
+      border-radius: 2.67vw; // 10px
+      box-shadow: 0 1.07vw 2.67vw rgba(0, 0, 0, 0.08);
     }
 
     .user-info {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 2.67vw; // 10px
 
       .welcome {
-        font-size: 18px;
+        font-size: 4.8vw; // 18px
         color: #333;
         margin: 0;
+        font-weight: 600;
       }
 
       .edit-btn {
-        font-size: 14px;
+        font-size: 3.73vw; // 14px
+        border-radius: 4.27vw; // 16px
+        padding: 0 3.2vw; // 12px
       }
     }
   }
@@ -275,61 +282,112 @@ onMounted(() => {
     .survey-items {
       .survey-item {
         background: #fff;
-        border-radius: 12px;
-        padding: 16px;
-        margin-bottom: 12px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+        border-radius: 4.27vw; // 16px
+        padding: 5.33vw; // 20px
+        margin-bottom: 4.27vw; // 16px
+        box-shadow: 0 1.07vw 3.2vw rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+        border: 0.27vw solid rgba(0, 0, 0, 0.03); // 1px
+        
+        &:hover {
+          transform: translateY(-0.53vw); // -2px
+          box-shadow: 0 1.6vw 4.27vw rgba(0, 0, 0, 0.08);
+        }
 
         .survey-info {
-          margin-bottom: 12px;
-
-          .status-tag {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            margin-bottom: 8px;
-
-            &.status-pending {
-              background-color: #e8f3ff;
-              color: #1989fa;
+          margin-bottom: 4.27vw; // 16px
+          
+          .title-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 3.2vw; // 12px
+            
+            .survey-title {
+              font-size: 4.53vw; // 17px
+              font-weight: 600;
+              color: #333;
+              margin: 0;
+              max-width: 70%;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              display: -webkit-box;
+              -webkit-line-clamp: 2;
+              -webkit-box-orient: vertical;
             }
+            
+            .status-tag {
+              padding: 1.33vw 2.67vw; // 5px 10px
+              border-radius: 3.2vw; // 12px
+              font-size: 3.47vw; // 13px
+              font-weight: 500;
+              white-space: nowrap;
+              border: 0.27vw solid transparent; // 1px
+              
+              &.status-pending {
+                background-color: #e8f3ff;
+                color: #1989fa;
+                border-color: rgba(25, 137, 250, 0.2);
+              }
 
-            &.status-completed {
-              background-color: #e8f7ef;
-              color: #07c160;
-            }
+              &.status-completed {
+                background-color: #e8f7ef;
+                color: #07c160;
+                border-color: rgba(7, 193, 96, 0.2);
+              }
 
-            &.status-locked {
-              background-color: #f5f5f5;
-              color: #909399;
+              &.status-locked {
+                background-color: #f5f5f5;
+                color: #909399;
+                border-color: rgba(144, 147, 153, 0.2);
+              }
             }
           }
 
           .time {
-            font-size: 13px;
+            font-size: 3.47vw; // 13px
             color: #999;
+            display: flex;
+            align-items: center;
           }
         }
 
         .survey-actions {
           display: flex;
           justify-content: flex-end;
-          gap: 8px;
+          gap: 2.67vw; // 10px
 
           .van-button {
-            min-width: 64px;
-            border-radius: 6px;
+            min-width: 18.13vw; // 68px
+            border-radius: 5.33vw; // 20px
+            font-size: 3.73vw; // 14px
+            font-weight: 500;
+            transition: all 0.2s;
+            
+            &:active {
+              transform: scale(0.98);
+            }
 
             &--primary {
               background: #1989fa;
               border-color: #1989fa;
+              box-shadow: 0 0.8vw 2.13vw rgba(25, 137, 250, 0.2); // 3px 8px
+              
+              &:hover {
+                background: #0d7fe4;
+                border-color: #0d7fe4;
+              }
             }
 
             &--plain {
               color: #666;
               border-color: #dcdee0;
+              
+              &:hover {
+                color: #1989fa;
+                border-color: #1989fa;
+                background-color: rgba(25, 137, 250, 0.05);
+              }
             }
 
             &--disabled {
@@ -342,15 +400,18 @@ onMounted(() => {
   }
 
   .dialog-content {
-    padding: 16px;
+    padding: 5.33vw; // 20px
 
     .tips {
-      margin-top: 12px;
-      font-size: 12px;
+      margin-top: 4.27vw; // 16px
+      font-size: 3.2vw; // 12px
       color: #999;
-      line-height: 1.5;
+      line-height: 1.6;
       text-align: center;
+      background-color: #f9f9f9;
+      padding: 2.67vw; // 10px
+      border-radius: 2.13vw; // 8px
     }
   }
 }
-</style> 
+</style>

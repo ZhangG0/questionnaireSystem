@@ -9,8 +9,10 @@
       @click="showPicker = true"
     />
     <van-popup v-model:show="showPicker" position="bottom">
-      <van-date-picker
-        v-model="selectedDate"
+      <van-datetime-picker
+        type="date"
+        title="选择日期"
+        v-model="currentDate"
         @confirm="onConfirm"
         @cancel="showPicker = false"
       />
@@ -32,13 +34,16 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
 }>()
 
-const selectedDate = ref(props.modelValue)
+const selectedDate = ref(props.modelValue || '')
+const currentDate = ref(new Date())
 const showPicker = ref(false)
 
-const onConfirm = (value: string) => {
-  selectedDate.value = value
+const onConfirm = (value: Date) => {
+  // 格式化日期为 YYYY-MM-DD 格式
+  const formattedDate = `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+  selectedDate.value = formattedDate
   showPicker.value = false
-  emit('update:modelValue', value)
+  emit('update:modelValue', formattedDate)
 }
 
 watch(() => props.modelValue, (newValue) => {

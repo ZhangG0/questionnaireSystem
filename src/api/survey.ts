@@ -78,24 +78,6 @@ export const getQuantityStatistics = (params: { surveyId: string }) => {
 }
 
 /**
- * 获取 H5 端问卷列表
- */
-export const getH5SurveysList = () => {
-  return post<{
-    surveyId: string
-    status: string
-    bindTime: string
-  }[]>('/app/surveys/list')
-}
-
-/**
- * 获取问卷详情
- */
-export const getH5SurveyDetail = (params: { surveyId: string }) => {
-  return post<SurveyDetail>('/app/surveys/getSurveysBySurveyId', params)
-}
-
-/**
  * 复制问卷
  */
 export const copySurvey = (params: { surveyId: string }) => {
@@ -107,4 +89,40 @@ export const copySurvey = (params: { surveyId: string }) => {
  */
 export const getEditSurvey = (params: { surveyId: string }) => {
   return post<SurveyRequest>('/surveys/editSurveys', params)
-} 
+}
+
+/**
+ * 获取 H5 端问卷列表
+ */
+export const getH5SurveysList = () => {
+  return post<{
+    surveyId: string
+    responseStatus: string
+    bindTime: string
+    surveyTitle: string
+    responseId: string
+  }[]>('app/user/surveys')
+}
+
+/**
+ * H5获取问卷详情
+ */
+export const getH5SurveyDetail = (params: { surveyId: string }) => {
+  return post<SurveyDetail>('/app/surveys/getSurveysBySurveyId', params)
+}
+
+/**
+ * H5获取问卷详情（含答案，不含逻辑）
+ */
+export const getH5SurveyAllDetail = (params: { surveyId: string, responseId: string }) => {
+  return post<SurveyDetail>('app/surveys/getFillSurveysDetail', params)
+}
+
+/**
+ * H5获取问卷详情（含答案）
+ */
+export const editH5SurveyAllDetail = (params: { surveyId: string, responseId: string }) => {
+  return post<SurveyDetail>('app/surveys/editFillSurveysDetail', params)
+}
+
+
